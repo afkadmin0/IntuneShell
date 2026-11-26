@@ -11,7 +11,7 @@
     Author               = 'Carlo Rohrer'
     CompanyName          = 'IntuneShell'
     Copyright            = '(c) 2026 Carlo Rohrer. All rights reserved.'
-    Description          = 'Find the Intune policies, endpoint security profiles and remediations a group is assigned to or excluded from'
+    Description          = 'NOT AFILIATED WITH MICROSOFT IN ANY WAY. CmdLets for managing Intune.'
 
     PowerShellVersion    = '5.1'
 
