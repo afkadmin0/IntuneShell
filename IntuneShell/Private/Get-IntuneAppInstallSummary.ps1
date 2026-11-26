@@ -1,40 +1,40 @@
 function Get-IntuneAppInstallSummary
 {
     [CmdletBinding()]
-    param()
+    param([Parameter(Mandatory)][AllowEmptyCollection()][string[]]$AppId)
 
-    $uri = 'https://graph.microsoft.com/beta/deviceManagement/reports/getAppsInstallSummaryReport'
-    $top = 50
-    $skip = 0
     $lookup = @{}
+    $failed = 0
+    $batchSize = 20
 
-    do
+    for ($offset = 0; $offset -lt $AppId.Count; $offset += $batchSize)
     {
-        $body = @{ skip = $skip; top = $top; filter = ''; search = ''; orderBy = @() } | ConvertTo-Json
-        $response = Invoke-MgGraphRequest -Method POST -Uri $uri -Body $body -ContentType 'application/json' -ErrorAction Stop
+        $chunk = @($AppId[$offset..([math]::Min($offset + $batchSize, $AppId.Count) - 1)])
 
-        $columns = @($response['Schema'] | ForEach-Object { $_['Column'] })
-        $rows = @($response['Values'] | Where-Object { $null -ne $_ })
+        $body = @{
+            requests = @($chunk | ForEach-Object {
+                    @{ id = $_; method = 'GET'; url = "/deviceAppManagement/mobileApps/$_/installSummary" }
+                })
+        } | ConvertTo-Json -Depth 5
 
-        foreach ($row in $rows)
+        $response = Invoke-MgGraphRequest -Method POST -Uri 'https://graph.microsoft.com/beta/$batch' -Body $body -ContentType 'application/json' -ErrorAction Stop
+
+        foreach ($item in $response['responses'])
         {
-            $record = @{}
-            for ($i = 0; $i -lt $columns.Count; $i++) { $record[$columns[$i]] = $row[$i] }
+            if ($item['status'] -ne 200) { $failed++; continue }
 
-            $lookup["$($record['ApplicationId'])"] = [pscustomobject]@{
-                Installed     = [int]$record['InstalledDeviceCount']
-                Failed        = [int]$record['FailedDeviceCount']
-                Pending       = [int]$record['PendingInstallDeviceCount']
-                NotInstalled  = [int]$record['NotInstalledDeviceCount']
-                NotApplicable = [int]$record['NotApplicableDeviceCount']
+            $summary = $item['body']
+            $lookup["$($item['id'])"] = [pscustomobject]@{
+                Installed     = [int]$summary['installedDeviceCount']
+                Failed        = [int]$summary['failedDeviceCount']
+                Pending       = [int]$summary['pendingInstallDeviceCount']
+                NotInstalled  = [int]$summary['notInstalledDeviceCount']
+                NotApplicable = [int]$summary['notApplicableDeviceCount']
             }
         }
-
-        $skip += $rows.Count
-        $total = $response['TotalRowCount']
-        $more = if ($null -ne $total) { $skip -lt [int]$total } else { $rows.Count -ge $top }
     }
-    while ($rows.Count -gt 0 -and $more)
+
+    if ($failed -gt 0) { Write-Warning "Install statistics could not be read for $failed app(s); they are reported with 0 devices." }
 
     $lookup
 }

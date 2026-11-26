@@ -11,10 +11,11 @@ function Get-IntuneWindowsApplications
 
     Confirm-GraphConnection -Scopes 'DeviceManagementApps.Read.All'
 
-    $summary = Get-IntuneAppInstallSummary
+    $apps = @(Get-IntuneWindowsApp -Type $Type | Where-Object { $_.AppName -like $Name })
 
-    Get-IntuneWindowsApp -Type $Type |
-    Where-Object { $_.AppName -like $Name } |
+    $summary = Get-IntuneAppInstallSummary -AppId @($apps.AppId)
+
+    $apps |
     ConvertTo-IntuneAppResult -Summary $summary |
     Sort-Object @{ Expression = 'FailureRate'; Descending = $true }, @{ Expression = 'FailedDevices'; Descending = $true }, AppName
 }
