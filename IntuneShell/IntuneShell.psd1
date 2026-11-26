@@ -2,7 +2,7 @@
 
     RootModule           = 'IntuneShell.psm1'
 
-    ModuleVersion        = '0.1.2'
+    ModuleVersion        = '0.1.3'
 
     CompatiblePSEditions = @('Desktop', 'Core')
 
@@ -19,11 +19,15 @@
         'Microsoft.Graph.Authentication'
         'Microsoft.Graph.Groups'
         'Microsoft.Graph.DeviceManagement'
+        'Microsoft.Graph.Devices.CorporateManagement'
     )
 
     FunctionsToExport    = @(
         'Get-IntunePolicyByGroup'
         'Get-IntuneRemediationByGroup'
+        'Get-IntuneWindowsApplications'
+        'Get-IntuneWindowsApplicationAssignment'
+        'Get-IntuneWindowsApplicationByGroup'
     )
 
     CmdletsToExport      = @()

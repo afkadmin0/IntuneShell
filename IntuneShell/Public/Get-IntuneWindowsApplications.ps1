@@ -1,0 +1,20 @@
+function Get-IntuneWindowsApplications
+{
+    [CmdletBinding()]
+    param(
+        [Parameter(Position = 0)]
+        [string]$Name = '*',
+
+        [ValidateSet('Win32', 'MSI', 'Modern', 'Store', 'Microsoft365')]
+        [string[]]$Type = @('Win32', 'MSI', 'Modern', 'Store', 'Microsoft365')
+    )
+
+    Confirm-GraphConnection -Scopes 'DeviceManagementApps.Read.All'
+
+    $summary = Get-IntuneAppInstallSummary
+
+    Get-IntuneWindowsApp -Type $Type |
+    Where-Object { $_.AppName -like $Name } |
+    ConvertTo-IntuneAppResult -Summary $summary |
+    Sort-Object @{ Expression = 'FailureRate'; Descending = $true }, @{ Expression = 'FailedDevices'; Descending = $true }, AppName
+}
