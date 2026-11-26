@@ -13,7 +13,7 @@ function Get-IntuneWindowsApplications
 
     $apps = @(Get-IntuneWindowsApp -Type $Type | Where-Object { $_.AppName -like $Name })
 
-    $summary = Get-IntuneAppInstallSummary -AppId @($apps.AppId)
+    $summary = Get-IntuneAppInstallSummary
 
     $apps |
     ConvertTo-IntuneAppResult -Summary $summary |

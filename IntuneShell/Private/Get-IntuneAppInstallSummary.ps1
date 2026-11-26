@@ -1,40 +1,65 @@
 function Get-IntuneAppInstallSummary
 {
+    # Device install counts for every app, keyed by app ID.
+    # Uses the Intune "AppInstallStatusAggregate" export report (the same data the
+    # portal shows). Export jobs are asynchronous: create the job, poll until it is
+    # completed, download the zipped CSV and parse it. No cmdlet exists for this,
+    # so Invoke-MgGraphRequest is used.
     [CmdletBinding()]
-    param([Parameter(Mandatory)][AllowEmptyCollection()][string[]]$AppId)
+    param([int]$TimeoutSeconds = 300)
 
-    $lookup = @{}
-    $failed = 0
-    $batchSize = 20
+    $base = 'https://graph.microsoft.com/v1.0/deviceManagement/reports/exportJobs'
+    $body = @{ reportName = 'AppInstallStatusAggregate'; format = 'csv' } | ConvertTo-Json
 
-    for ($offset = 0; $offset -lt $AppId.Count; $offset += $batchSize)
+    try
     {
-        $chunk = @($AppId[$offset..([math]::Min($offset + $batchSize, $AppId.Count) - 1)])
-
-        $body = @{
-            requests = @($chunk | ForEach-Object {
-                    @{ id = $_; method = 'GET'; url = "/deviceAppManagement/mobileApps/$_/installSummary" }
-                })
-        } | ConvertTo-Json -Depth 5
-
-        $response = Invoke-MgGraphRequest -Method POST -Uri 'https://graph.microsoft.com/beta/$batch' -Body $body -ContentType 'application/json' -ErrorAction Stop
-
-        foreach ($item in $response['responses'])
-        {
-            if ($item['status'] -ne 200) { $failed++; continue }
-
-            $summary = $item['body']
-            $lookup["$($item['id'])"] = [pscustomobject]@{
-                Installed     = [int]$summary['installedDeviceCount']
-                Failed        = [int]$summary['failedDeviceCount']
-                Pending       = [int]$summary['pendingInstallDeviceCount']
-                NotInstalled  = [int]$summary['notInstalledDeviceCount']
-                NotApplicable = [int]$summary['notApplicableDeviceCount']
-            }
-        }
+        $job = Invoke-MgGraphRequest -Method POST -Uri $base -Body $body -ContentType 'application/json' -ErrorAction Stop
+    }
+    catch
+    {
+        Write-Verbose "v1.0 export job failed ($($_.Exception.Message)); trying beta."
+        $base = 'https://graph.microsoft.com/beta/deviceManagement/reports/exportJobs'
+        $job = Invoke-MgGraphRequest -Method POST -Uri $base -Body $body -ContentType 'application/json' -ErrorAction Stop
     }
 
-    if ($failed -gt 0) { Write-Warning "Install statistics could not be read for $failed app(s); they are reported with 0 devices." }
+    $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
+    while ($job['status'] -ne 'completed')
+    {
+        if ($job['status'] -eq 'failed') { throw 'The app install status export job failed.' }
+        if ((Get-Date) -gt $deadline) { throw "Timed out after $TimeoutSeconds seconds waiting for the app install status report." }
 
-    $lookup
+        Start-Sleep -Seconds 3
+        $job = Invoke-MgGraphRequest -Method GET -Uri "$base('$($job['id'])')" -ErrorAction Stop
+        Write-Verbose "Export job status: $($job['status'])"
+    }
+
+    $workDir = Join-Path ([System.IO.Path]::GetTempPath()) "IntuneShell-$([guid]::NewGuid())"
+    $null = New-Item -ItemType Directory -Path $workDir
+
+    try
+    {
+        $zip = Join-Path $workDir 'report.zip'
+        Invoke-WebRequest -Uri $job['url'] -OutFile $zip -UseBasicParsing -ErrorAction Stop
+        Expand-Archive -Path $zip -DestinationPath $workDir -Force
+
+        $csv = Get-ChildItem -Path $workDir -Filter *.csv | Select-Object -First 1
+        if (-not $csv) { throw 'The app install status report contained no CSV file.' }
+
+        $lookup = @{}
+        foreach ($row in Import-Csv -Path $csv.FullName)
+        {
+            $lookup["$($row.ApplicationId)"] = [pscustomobject]@{
+                Installed     = [int]$row.InstalledDeviceCount
+                Failed        = [int]$row.FailedDeviceCount
+                Pending       = [int]$row.PendingInstallDeviceCount
+                NotInstalled  = [int]$row.NotInstalledDeviceCount
+                NotApplicable = [int]$row.NotApplicableDeviceCount
+            }
+        }
+        $lookup
+    }
+    finally
+    {
+        Remove-Item -Path $workDir -Recurse -Force -ErrorAction SilentlyContinue
+    }
 }
