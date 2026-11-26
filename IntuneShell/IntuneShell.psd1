@@ -2,7 +2,7 @@
 
     RootModule           = 'IntuneShell.psm1'
 
-    ModuleVersion        = '0.1.3'
+    ModuleVersion        = '0.1.4'
 
     CompatiblePSEditions = @('Desktop', 'Core')
 
