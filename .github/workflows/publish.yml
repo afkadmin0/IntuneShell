@@ -18,7 +18,13 @@ jobs:
         shell: pwsh
         run: |
           Set-PSRepository PSGallery -InstallationPolicy Trusted
-          Install-Module Microsoft.Graph.Authentication, Microsoft.Graph.Groups, Microsoft.Graph.DeviceManagement -Scope CurrentUser -Force
+          $manifest = Import-PowerShellDataFile -Path ./IntuneShell/IntuneShell.psd1
+          foreach ($required in $manifest.RequiredModules)
+          {
+              $name = if ($required -is [hashtable]) { $required.ModuleName } else { $required }
+              Write-Host "Installing required module $name"
+              Install-Module -Name $name -Scope CurrentUser -Force
+          }
           Install-Module PSScriptAnalyzer -Scope CurrentUser -Force
 
       - name: Validate manifest
