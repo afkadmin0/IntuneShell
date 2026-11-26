@@ -2,7 +2,7 @@
 
     RootModule           = 'IntuneShell.psm1'
 
-    ModuleVersion        = '0.1.2'
+    ModuleVersion        = '0.1.3'
 
     CompatiblePSEditions = @('Desktop', 'Core')
 
@@ -11,7 +11,7 @@
     Author               = 'Carlo Rohrer'
     CompanyName          = 'IntuneShell'
     Copyright            = '(c) 2026 Carlo Rohrer. All rights reserved.'
-    Description          = 'Find the Intune policies, endpoint security profiles and remediations a group is assigned to or excluded from'
+    Description          = 'NOT AFILIATED WITH MICROSOFT IN ANY WAY. CmdLets for managing Intune.'
 
     PowerShellVersion    = '5.1'
 
@@ -19,11 +19,15 @@
         'Microsoft.Graph.Authentication'
         'Microsoft.Graph.Groups'
         'Microsoft.Graph.DeviceManagement'
+        'Microsoft.Graph.Devices.CorporateManagement'
     )
 
     FunctionsToExport    = @(
         'Get-IntunePolicyByGroup'
         'Get-IntuneRemediationByGroup'
+        'Get-IntuneWindowsApplications'
+        'Get-IntuneWindowsApplicationAssignment'
+        'Get-IntuneWindowsApplicationByGroup'
     )
 
     CmdletsToExport      = @()
