@@ -1,0 +1,60 @@
+name: Publish to PowerShell Gallery
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'      # e.g. v1.2.0 -> publishes version 1.2.0
+  workflow_dispatch:   # manual run: publishes the version currently in the .psd1
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        shell: pwsh
+        run: |
+          Set-PSRepository PSGallery -InstallationPolicy Trusted
+          Install-Module Microsoft.Graph.Authentication, Microsoft.Graph.Groups, Microsoft.Graph.DeviceManagement -Scope CurrentUser -Force
+          Install-Module PSScriptAnalyzer -Scope CurrentUser -Force
+
+      - name: Set version from tag
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: pwsh
+        run: |
+          $version = '${{ github.ref_name }}'.TrimStart('v')
+          Update-ModuleManifest -Path ./IntuneShell/IntuneShell.psd1 -ModuleVersion $version
+          Write-Host "Module version set to $version"
+
+      - name: Validate manifest
+        shell: pwsh
+        run: |
+          $m = Test-ModuleManifest -Path ./IntuneShell/IntuneShell.psd1 -ErrorAction Stop
+          Write-Host "Validated $($m.Name) $($m.Version)"
+
+      - name: Lint (errors only)
+        shell: pwsh
+        run: |
+          $errors = Invoke-ScriptAnalyzer -Path ./IntuneShell -Recurse -Severity Error
+          $errors | Format-Table -AutoSize
+          if ($errors) { throw "PSScriptAnalyzer found $($errors.Count) error(s)." }
+
+      - name: Import test
+        shell: pwsh
+        run: |
+          Import-Module ./IntuneShell/IntuneShell.psd1 -Force -ErrorAction Stop
+          $exported = (Get-Module IntuneShell).ExportedFunctions.Keys
+          Write-Host "Exported: $($exported -join ', ')"
+          if (-not $exported) { throw 'Module exports no functions.' }
+
+      - name: Publish
+        shell: pwsh
+        env:
+          NUGET_API_KEY: ${{ secrets.PSGALLERY_API_KEY }}
+        run: |
+          if (-not $env:NUGET_API_KEY) { throw 'Secret PSGALLERY_API_KEY is not set.' }
+          Publish-Module -Path ./IntuneShell -NuGetApiKey $env:NUGET_API_KEY -Repository PSGallery -Verbose
