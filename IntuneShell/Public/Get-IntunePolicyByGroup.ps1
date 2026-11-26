@@ -24,7 +24,8 @@ function Get-IntunePolicyByGroup
         'Get-IntuneCompliancePolicy',
         'Get-IntuneSettingsCatalogPolicy',
         'Get-IntuneEndpointSecurityIntent',
-        'Get-IntuneGroupPolicyConfiguration'
+        'Get-IntuneGroupPolicyConfiguration',
+        'Get-IntuneRemediationScript'
 
         $results = foreach ($getter in $getters)
         {
@@ -32,8 +33,7 @@ function Get-IntunePolicyByGroup
             catch { Write-Warning "$getter failed: $($_.Exception.Message)" }
         }
 
-        $results |
-        Where-Object { $AssignmentType -eq 'All' -or $_.AssignmentType -eq $AssignmentType } |
+        $results | Where-Object { $AssignmentType -eq 'All' -or $_.AssignmentType -eq $AssignmentType } |
         ForEach-Object {
             $_ | Add-Member -NotePropertyName GroupName -NotePropertyValue $resolved.DisplayName -PassThru
         } |
