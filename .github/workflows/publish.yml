@@ -2,9 +2,8 @@ name: Publish to PowerShell Gallery
 
 on:
   push:
-    tags:
-      - 'v*.*.*'      # e.g. v1.2.0 -> publishes version 1.2.0
-  workflow_dispatch:   # manual run: publishes the version currently in the .psd1
+    branches:
+      - main
 
 permissions:
   contents: read
@@ -22,19 +21,13 @@ jobs:
           Install-Module Microsoft.Graph.Authentication, Microsoft.Graph.Groups, Microsoft.Graph.DeviceManagement -Scope CurrentUser -Force
           Install-Module PSScriptAnalyzer -Scope CurrentUser -Force
 
-      - name: Set version from tag
-        if: startsWith(github.ref, 'refs/tags/v')
-        shell: pwsh
-        run: |
-          $version = '${{ github.ref_name }}'.TrimStart('v')
-          Update-ModuleManifest -Path ./IntuneShell/IntuneShell.psd1 -ModuleVersion $version
-          Write-Host "Module version set to $version"
-
       - name: Validate manifest
+        id: manifest
         shell: pwsh
         run: |
           $m = Test-ModuleManifest -Path ./IntuneShell/IntuneShell.psd1 -ErrorAction Stop
           Write-Host "Validated $($m.Name) $($m.Version)"
+          "version=$($m.Version)" >> $env:GITHUB_OUTPUT
 
       - name: Lint (errors only)
         shell: pwsh
@@ -51,7 +44,17 @@ jobs:
           Write-Host "Exported: $($exported -join ', ')"
           if (-not $exported) { throw 'Module exports no functions.' }
 
+      - name: Check if version is already published
+        id: gallery
+        shell: pwsh
+        run: |
+          $version = '${{ steps.manifest.outputs.version }}'
+          $existing = Find-Module -Name IntuneShell -RequiredVersion $version -Repository PSGallery -ErrorAction SilentlyContinue
+          if ($existing) { Write-Host "Version $version already on PSGallery; skipping publish. Bump ModuleVersion to release." }
+          "exists=$([bool]$existing)".ToLower() >> $env:GITHUB_OUTPUT
+
       - name: Publish
+        if: steps.gallery.outputs.exists != 'true'
         shell: pwsh
         env:
           NUGET_API_KEY: ${{ secrets.PSGALLERY_API_KEY }}
