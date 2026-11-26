@@ -28,20 +28,22 @@ function Get-IntuneWindowsApp
         windowsMicrosoftEdgeApp      = @{ Label = 'Microsoft Edge'; Version = $null }
     }
 
-    $filter = ($Type | ForEach-Object { $typeMap[$_] } | ForEach-Object { "isof('microsoft.graph.$_')" }) -join ' or '
+    $wanted = @($Type | ForEach-Object { $typeMap[$_] })
 
-    $params = @{ All = $true; Filter = $filter; ErrorAction = 'Stop' }
+    $params = @{ All = $true; ErrorAction = 'Stop' }
     if ($ExpandAssignments) { $params['ExpandProperty'] = 'assignments' }
 
     Get-MgDeviceAppManagementMobileApp @params | ForEach-Object {
         $odata = $_.AdditionalProperties['@odata.type'] -replace '^#microsoft\.graph\.', ''
+        if ($odata -notin $wanted) { return }
+
         $info = $typeInfo[$odata]
 
         [pscustomobject]@{
             AppId           = $_.Id
             AppName         = $_.DisplayName
-            AppType         = if ($info) { $info.Label } else { $odata }
-            Version         = if ($info -and $info.Version) { $_.AdditionalProperties[$info.Version] } else { $null }
+            AppType         = $info.Label
+            Version         = if ($info.Version) { $_.AdditionalProperties[$info.Version] } else { $null }
             Publisher       = $_.Publisher
             IsAssigned      = $_.IsAssigned
             CreatedDateTime = $_.CreatedDateTime
