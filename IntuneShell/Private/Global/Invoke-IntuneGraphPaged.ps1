@@ -1,18 +1,30 @@
 function Invoke-IntuneGraphPaged
 {
     [CmdletBinding()]
-    param([Parameter(Mandatory)][string]$Path)
+    param(
+        [Parameter(Mandatory)][string]$Path,
 
-    $base = 'https://graph.microsoft.com/v1.0'
-    try
+        # Query the beta endpoint only (no v1.0 attempt). Needed for objects that only exist in beta.
+        [switch]$Beta
+    )
+
+    if ($Beta)
     {
-        $response = Invoke-MgGraphRequest -Method GET -Uri "$base/$Path" -ErrorAction Stop
+        $response = Invoke-IntuneGraphRequest -Path "https://graph.microsoft.com/beta/$Path"
     }
-    catch
+    else
     {
-        Write-Verbose "v1.0 request for '$Path' failed ($($_.Exception.Message)); falling back to beta."
-        $base = 'https://graph.microsoft.com/beta'
-        $response = Invoke-MgGraphRequest -Method GET -Uri "$base/$Path" -ErrorAction Stop
+        $base = 'https://graph.microsoft.com/v1.0'
+        try
+        {
+            $response = Invoke-MgGraphRequest -Method GET -Uri "$base/$Path" -ErrorAction Stop
+        }
+        catch
+        {
+            Write-Verbose "v1.0 request for '$Path' failed ($($_.Exception.Message)); falling back to beta."
+            $base = 'https://graph.microsoft.com/beta'
+            $response = Invoke-MgGraphRequest -Method GET -Uri "$base/$Path" -ErrorAction Stop
+        }
     }
 
     while ($true)
@@ -20,6 +32,6 @@ function Invoke-IntuneGraphPaged
         $response['value']
         $next = $response['@odata.nextLink']
         if (-not $next) { break }
-        $response = Invoke-MgGraphRequest -Method GET -Uri $next -ErrorAction Stop
+        $response = Invoke-IntuneGraphRequest -Path $next
     }
 }

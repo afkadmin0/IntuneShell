@@ -12,7 +12,7 @@ function Confirm-GraphConnection
 
     if ($context)
     {
-        $missing = @($Scopes | Where-Object { $_ -notin $context.Scopes })
+        $missing = @($Scopes | Where-Object { $_ -notin $context.Scopes -and ($_ -replace '\.Read\.', '.ReadWrite.') -notin $context.Scopes })
         
         if ($missing.Count -eq 0 -or $context.AuthType -eq 'AppOnly')
         {
