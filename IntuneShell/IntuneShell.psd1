@@ -2,7 +2,7 @@
 
     RootModule           = 'IntuneShell.psm1'
 
-    ModuleVersion        = '0.1.4'
+    ModuleVersion        = '0.2.0'
 
     CompatiblePSEditions = @('Desktop', 'Core')
 
@@ -26,8 +26,15 @@
         'Get-IntunePolicyByGroup'
         'Get-IntuneRemediationByGroup'
         'Get-IntuneWindowsApplications'
+        'Get-IntuneWindowsApplicationsWithStats'
         'Get-IntuneWindowsApplicationAssignment'
         'Get-IntuneWindowsApplicationByGroup'
+        'Start-IntuneBackup'
+        'Restore-IntuneConfigurationPolicy'
+        'Restore-IntuneAdmxFile'
+        'Restore-IntuneCompliancePolicy'
+        'Restore-IntuneRemediationScript'
+        'Restore-IntuneApplication'
     )
 
     CmdletsToExport      = @()
